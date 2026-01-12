@@ -212,4 +212,79 @@ program
     }
   });
 
+program
+  .command("render <component>")
+  .description("Render a component to an image file")
+  .option("--output <path>", "Output file path (png or svg)", "output.png")
+  .option("--width <number>", "Image width in pixels", "800")
+  .option("--height <number>", "Image height in pixels", "600")
+  .option("--title <text>", "Title text for card component")
+  .option("--description <text>", "Description text for card component")
+  .option("--text <text>", "Text content for badge component")
+  .option("--variant <name>", "Component variant (default, dark, light, success, etc.)")
+  .option("--props <json>", "Additional props as JSON")
+  .action(async (component: string, options) => {
+    const React = await import("react");
+    const { renderToFile, Card, CardContent, CardRow, Badge, BadgeGroup } = await import("./image");
+
+    const width = parseInt(options.width, 10);
+    const height = parseInt(options.height, 10);
+    const format = options.output.endsWith(".svg") ? "svg" : "png";
+    const extraProps = options.props ? JSON.parse(options.props) : {};
+
+    let element: React.ReactElement;
+
+    switch (component) {
+      case "card":
+        element = React.createElement(Card, {
+          title: options.title || "Card Title",
+          description: options.description,
+          variant: options.variant || "default",
+          ...extraProps,
+        }, extraProps.rows ? React.createElement(
+          CardContent,
+          null,
+          ...extraProps.rows.map((row: { label: string; value: string }, i: number) =>
+            React.createElement(CardRow, { key: i, label: row.label, value: row.value, variant: options.variant })
+          )
+        ) : null);
+        break;
+
+      case "badge":
+        element = React.createElement(Badge, {
+          variant: options.variant || "default",
+          children: options.text || "Badge",
+          ...extraProps,
+        });
+        break;
+
+      case "badges":
+        const badges = extraProps.badges || [
+          { text: "Success", variant: "success" },
+          { text: "Warning", variant: "warning" },
+          { text: "Error", variant: "error" },
+        ];
+        element = React.createElement(
+          "div",
+          { style: { display: "flex", padding: 24, background: "#1a1a1a", gap: 8 } },
+          React.createElement(
+            BadgeGroup,
+            null,
+            ...badges.map((b: { text: string; variant: string }, i: number) =>
+              React.createElement(Badge, { key: i, variant: b.variant as any, children: b.text })
+            )
+          )
+        );
+        break;
+
+      default:
+        console.error(`Unknown component: ${component}`);
+        console.log("Available components: card, badge, badges");
+        process.exit(1);
+    }
+
+    await renderToFile(element, options.output, { width, height, format });
+    console.log(`Rendered ${component} to ${options.output} (${width}x${height} ${format})`);
+  });
+
 program.parse();
